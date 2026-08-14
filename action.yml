@@ -1,0 +1,109 @@
+name: 'Java Maintainer Kit'
+description: 'Analyze Java/Maven PR impact: modules, dependency diffs, risks, and review guidance.'
+author: 'Java Maintainer Kit Contributors'
+branding:
+  icon: 'git-pull-request'
+  color: 'blue'
+
+inputs:
+  base-ref:
+    description: 'Git base ref to compare against (e.g. origin/main)'
+    required: true
+  head-ref:
+    description: 'Git head ref (default: HEAD)'
+    required: false
+    default: 'HEAD'
+  repo-path:
+    description: 'Path to the repository root inside the workspace'
+    required: false
+    default: '.'
+  format:
+    description: 'Report format: markdown or json'
+    required: false
+    default: 'markdown'
+  comment-on-pr:
+    description: 'If true, post/update a PR comment with the report'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token used to comment on the PR'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  report-path:
+    description: 'Path to the generated report file'
+    value: ${{ steps.analyze.outputs.report-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: 'maven'
+        cache-dependency-path: ${{ github.action_path }}/pom.xml
+
+    - name: Build JMK CLI
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: mvn -B -q -pl jmk-cli -am package -DskipTests
+
+    - name: Analyze repository
+      id: analyze
+      shell: bash
+      working-directory: ${{ inputs.repo-path }}
+      run: |
+        set -euo pipefail
+        REPORT_PATH="${{ github.workspace }}/jmk-report.md"
+        if [ "${{ inputs.format }}" = "json" ]; then
+          REPORT_PATH="${{ github.workspace }}/jmk-report.json"
+        fi
+        java -jar "${{ github.action_path }}/jmk-cli/target/jmk-cli.jar" analyze \
+          --repo "${{ inputs.repo-path }}" \
+          --base "${{ inputs.base-ref }}" \
+          --head "${{ inputs.head-ref }}" \
+          --format "${{ inputs.format }}" \
+          --output "$REPORT_PATH"
+        echo "report-path=$REPORT_PATH" >> "$GITHUB_OUTPUT"
+        echo "JMK report written to $REPORT_PATH"
+
+    - name: Publish report to job summary
+      if: inputs.format == 'markdown'
+      shell: bash
+      run: |
+        cat "${{ steps.analyze.outputs.report-path }}" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on pull request
+      if: inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' && inputs.format == 'markdown'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const body = fs.readFileSync('${{ steps.analyze.outputs.report-path }}', 'utf8');
+          const marker = '<!-- java-maintainer-kit-report -->';
+          const content = `${marker}\n${body}`;
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: content,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: content,
+            });
+          }
