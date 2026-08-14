@@ -15,6 +15,8 @@ Open-source Java repositories burn maintainer time on the same questions every P
 
 **Java Maintainer Kit** answers those in one CLI and one GitHub Action — no SaaS, no lock-in.
 
+Live consumer demo: [blueskyno6/jmk-demo](https://github.com/blueskyno6/jmk-demo) (see [PR #1](https://github.com/blueskyno6/jmk-demo/pull/1) for a real JMK Action comment).
+
 ## Features
 
 - **Module impact mapping** for multi-module Maven reactors
