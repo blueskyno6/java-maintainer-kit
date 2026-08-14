@@ -111,7 +111,11 @@ java-maintainer-kit/
 
 ## Why this project exists
 
-Maintaining Java OSS means reviewing reactors, BOM bumps, and release notes under time pressure. JMK turns that into a repeatable, automatable workflow — the same class of maintainer automation OpenAI’s Codex for Open Source program is designed to support.
+Maintaining Java OSS means reviewing multi-module reactors, BOM bumps, risky paths, and release notes under time pressure. JMK turns that into a **repeatable maintainer workflow**: deterministic analysis first (modules, dependency diffs, risk signals), then optional LLM-assisted review on top.
+
+That matches how serious open-source maintenance actually works — PR review, triage, and releases — and is deliberately shaped for GitHub Action automation rather than a one-off demo.
+
+Applying to OpenAI’s Codex for Open Source program? See the researched, paste-ready draft in [`docs/CODEX_FOR_OSS_APPLICATION.md`](docs/CODEX_FOR_OSS_APPLICATION.md).
 
 ## Roadmap
 
