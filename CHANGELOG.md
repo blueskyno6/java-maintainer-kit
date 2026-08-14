@@ -2,9 +2,18 @@
 
 ## Unreleased
 
+## v0.1.1
+
 ### Features
 
-- Initial Java Maintainer Kit release candidate
+- GitHub Action downloads prebuilt `jmk-cli.jar` from Releases (no consumer-side Maven build)
+- New inputs: `jmk-version` (`latest` or a tag) and `build-from-source` (dogfooding only)
+
+## v0.1.0
+
+### Features
+
+- Initial Java Maintainer Kit release
 - Maven multi-module impact analysis
 - POM dependency diffs
 - Risk signals and review recommendations

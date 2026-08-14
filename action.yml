@@ -26,30 +26,99 @@ inputs:
     required: false
     default: 'true'
   github-token:
-    description: 'Token used to comment on the PR'
+    description: 'Token used to comment on the PR and (if needed) read releases'
     required: false
     default: ${{ github.token }}
+  jmk-version:
+    description: 'Release tag to download (e.g. v0.1.1), or "latest"'
+    required: false
+    default: 'latest'
+  build-from-source:
+    description: 'If true, build the CLI from the action checkout instead of downloading a release jar'
+    required: false
+    default: 'false'
 
 outputs:
   report-path:
     description: 'Path to the generated report file'
     value: ${{ steps.analyze.outputs.report-path }}
+  jmk-jar:
+    description: 'Path to the JMK CLI jar used for analysis'
+    value: ${{ steps.resolve.outputs.jmk-jar }}
 
 runs:
   using: 'composite'
   steps:
     - name: Set up Java
+      if: inputs.build-from-source != 'true'
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
-        cache: 'maven'
+
+    - name: Set up Java with Maven cache
+      if: inputs.build-from-source == 'true'
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        cache: maven
         cache-dependency-path: ${{ github.action_path }}/pom.xml
 
-    - name: Build JMK CLI
+    - name: Resolve JMK CLI jar
+      id: resolve
       shell: bash
-      working-directory: ${{ github.action_path }}
-      run: mvn -B -q -pl jmk-cli -am package -DskipTests
+      env:
+        ACTION_REPO: ${{ github.action_repository }}
+        JMK_VERSION: ${{ inputs.jmk-version }}
+        BUILD_FROM_SOURCE: ${{ inputs.build-from-source }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        JAR_DIR="${RUNNER_TEMP}/jmk"
+        mkdir -p "$JAR_DIR"
+        JAR_PATH="${JAR_DIR}/jmk-cli.jar"
+
+        if [ "${BUILD_FROM_SOURCE}" = "true" ]; then
+          echo "Building JMK CLI from action source..."
+          mvn -B -q -f "${{ github.action_path }}/pom.xml" -pl jmk-cli -am package -DskipTests
+          cp "${{ github.action_path }}/jmk-cli/target/jmk-cli.jar" "$JAR_PATH"
+        else
+          if [ -z "${ACTION_REPO}" ]; then
+            echo "github.action_repository is empty; cannot download release jar."
+            exit 1
+          fi
+
+          API_ROOT="${GITHUB_API_URL:-https://api.github.com}"
+          AUTH_HEADER=()
+          if [ -n "${GH_TOKEN}" ]; then
+            AUTH_HEADER=(-H "Authorization: Bearer ${GH_TOKEN}")
+          fi
+
+          if [ "${JMK_VERSION}" = "latest" ]; then
+            echo "Resolving latest release for ${ACTION_REPO}..."
+            TAG=$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -H "User-Agent: java-maintainer-kit-action" \
+              "${AUTH_HEADER[@]}" \
+              "${API_ROOT}/repos/${ACTION_REPO}/releases/latest" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')
+          else
+            TAG="${JMK_VERSION}"
+          fi
+
+          DOWNLOAD_URL="https://github.com/${ACTION_REPO}/releases/download/${TAG}/jmk-cli.jar"
+          echo "Downloading ${DOWNLOAD_URL}"
+          curl -fsSL \
+            -H "User-Agent: java-maintainer-kit-action" \
+            -o "$JAR_PATH" \
+            "$DOWNLOAD_URL"
+          echo "Using JMK ${TAG}"
+        fi
+
+        test -s "$JAR_PATH"
+        echo "jmk-jar=${JAR_PATH}" >> "$GITHUB_OUTPUT"
 
     - name: Analyze repository
       id: analyze
@@ -61,7 +130,7 @@ runs:
         if [ "${{ inputs.format }}" = "json" ]; then
           REPORT_PATH="${{ github.workspace }}/jmk-report.json"
         fi
-        java -jar "${{ github.action_path }}/jmk-cli/target/jmk-cli.jar" analyze \
+        java -jar "${{ steps.resolve.outputs.jmk-jar }}" analyze \
           --repo "${{ inputs.repo-path }}" \
           --base "${{ inputs.base-ref }}" \
           --head "${{ inputs.head-ref }}" \

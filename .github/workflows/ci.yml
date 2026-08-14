@@ -49,3 +49,5 @@ jobs:
           base-ref: origin/${{ github.base_ref }}
           head-ref: HEAD
           comment-on-pr: 'true'
+          # Exercise PR code paths; consumers should keep the default (download release jar).
+          build-from-source: 'true'

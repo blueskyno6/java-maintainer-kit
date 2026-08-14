@@ -18,7 +18,7 @@ import picocli.CommandLine.Parameters;
 @Command(
     name = "jmk",
     mixinStandardHelpOptions = true,
-    version = "java-maintainer-kit 0.1.0-SNAPSHOT",
+    version = "java-maintainer-kit 0.1.1",
     description = "Java Maintainer Kit - PR impact analysis and changelogs for Maven repos.",
     subcommands = {AnalyzeCommand.class, ChangelogCommand.class})
 public final class JmkMain implements Callable<Integer> {

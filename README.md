@@ -62,12 +62,15 @@ jobs:
           fetch-depth: 0
 
       - name: Java Maintainer Kit
-        uses: blueskyno6/java-maintainer-kit@v0.1.0
+        uses: blueskyno6/java-maintainer-kit@v0.1.1
         with:
           base-ref: origin/${{ github.base_ref }}
           head-ref: HEAD
           comment-on-pr: 'true'
+          jmk-version: v0.1.1
 ```
+
+The Action downloads a prebuilt `jmk-cli.jar` from GitHub Releases (no Maven build in consumer CI). Pin a tag or use `jmk-version: latest`.
 
 ### Action inputs
 
@@ -78,7 +81,9 @@ jobs:
 | `repo-path` | `.` | Repository path |
 | `format` | `markdown` | `markdown` or `json` |
 | `comment-on-pr` | `true` | Post/update PR comment |
-| `github-token` | `${{ github.token }}` | Token for commenting |
+| `github-token` | `${{ github.token }}` | Token for commenting / reading releases |
+| `jmk-version` | `latest` | Release tag to download (`v0.1.1`, or `latest`) |
+| `build-from-source` | `false` | Build CLI from action source (for JMK dogfooding only) |
 
 ## Example report
 
@@ -122,7 +127,7 @@ Applying to OpenAI’s Codex for Open Source program? See the researched, paste-
 - [ ] Gradle / Kotlin DSL support
 - [ ] Optional japicmp binary-compatibility checks
 - [ ] Maven Central publishing
-- [ ] Prebuilt Action jar download (skip on-the-fly build)
+- [x] Prebuilt Action jar download (skip on-the-fly build)
 - [ ] SARIF export for security-sensitive path hits
 
 ## Contributing
